@@ -1,0 +1,8 @@
+repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.14.0
+  hooks:
+    # When running with --fix, Ruff's lint hook should be placed before Ruff's formatter hook
+    - id: ruff-check
+      args: [ --fix ]
+    - id: ruff-format
