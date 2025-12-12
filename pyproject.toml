@@ -7,7 +7,11 @@ dependencies = [
     "alembic>=1.17.2",
     "asyncpg>=0.31.0",
     "fastapi>=0.123.5",
+    "pre-commit>=4.5.0",
+    "pydantic-settings>=2.12.0",
+    "pyjwt[crypto]>=2.10.1",
     "python-dotenv>=1.2.1",
+    "redis[asyncio]>=7.1.0",
     "sqlmodel>=0.0.27",
     "uvicorn>=0.38.0",
 ]
@@ -36,6 +40,7 @@ select = [
     "RUF",    # ruff-specific rules
 ]
 ignore = [
+    "B008",   # Do not perform function call `Depends` in argument default
     "E402",   # imports at the top of the file
     "E501",   # line too long (handled by formatter)
     "E731",   # Do not assign a `lambda` expression, use a `def` - rule ignored
