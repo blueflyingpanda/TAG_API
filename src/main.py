@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
+from api.auth import router
 from cache import close_cache, init_cache
-from router import router
 
 
 @asynccontextmanager
@@ -20,7 +20,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://blueflyingpanda.github.io'],  # or ['*'] for dev
+    allow_origins=['https://blueflyingpanda.github.io'],
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
