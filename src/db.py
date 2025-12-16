@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlmodel import Field, Relationship, SQLModel
 
 from conf import settings
+from schemas.theme import ThemeBase
+from schemas.user import UserBase
 
 
-class DbModel(SQLModel, table=False):
+class DbModel(SQLModel):
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
@@ -23,13 +25,11 @@ class DbModel(SQLModel, table=False):
     )
 
 
-class User(DbModel, table=True):
+class User(DbModel, UserBase, table=True):
     __tablename__ = 'users'
 
-    admin: bool = Field(default=False)
     email: str = Field(max_length=255, unique=True, index=True)
 
-    picture: str | None = Field(default=None)
     last_login: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),
@@ -54,7 +54,7 @@ class Auth(DbModel, table=True):
     aux_token: str | None
 
 
-class Theme(DbModel, table=True):
+class Theme(DbModel, ThemeBase, table=True):
     __tablename__ = 'themes'
 
     name: str = Field(max_length=255, unique=True, index=True)
@@ -67,8 +67,6 @@ class Theme(DbModel, table=True):
     created_by: int | None = Field(default=None, foreign_key='users.id')
     public: bool = Field(default=False)
     verified: bool = Field(default=False)
-    language: str = Field(default='en', max_length=2)  # ISO 639 alpha-2
-    difficulty: int = Field(default=1, ge=1, le=5)
 
     creator: User | None = Relationship(back_populates='themes')
     games: list[Game] = Relationship(back_populates='theme')
@@ -97,7 +95,7 @@ class Game(DbModel, table=True):
 
 
 DATABASE_URL = f'postgresql+asyncpg://{settings.db_user}:{settings.db_pass}@{settings.db_host}:{settings.db_port}/{settings.db_name}'
-engine = create_async_engine(DATABASE_URL, echo=True, future=True)
+engine = create_async_engine(DATABASE_URL, echo=False, future=True)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 

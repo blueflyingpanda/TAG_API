@@ -1,9 +1,14 @@
+import logging
 from datetime import UTC, datetime
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
+from starlette import status
 
-from db import Auth, User
+from db import Auth, DbModel, User
+
+logger = logging.getLogger('dal')
 
 
 async def get_or_create_user(id_token_payload: dict, db: AsyncSession) -> User:
@@ -49,3 +54,14 @@ async def update_or_create_auth(
     await db.commit()
     await db.refresh(auth)
     return auth
+
+
+async def get_or_404(db: AsyncSession, model: type[DbModel], record_id: int) -> DbModel:
+    """Get an instance by ID or raise 404"""
+    instance = await db.get(model, record_id)
+    if not instance:
+        logger.error('No such %s: %r', model, record_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f'{model.__name__} with id {record_id} not found'
+        )
+    return instance

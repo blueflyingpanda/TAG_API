@@ -1,14 +1,19 @@
 import secrets
 import urllib.parse
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 import jwt
-from fastapi import HTTPException
+from fastapi import Depends, Header
 from jwt import PyJWKClient
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from conf import settings
-from db import User
+from db import User, get_db
+from errors import AuthError
+from schemas.user import UserBase
 
 
 async def generate_oauth_redirect_uri(redis: Redis) -> str:
@@ -54,10 +59,10 @@ async def verify_id_token(id_token: str, expected_nonce: str) -> dict:
     )
 
     if payload.get('nonce') != expected_nonce:
-        raise HTTPException(status_code=400, detail='Nonce mismatch - potential replay attack')
+        raise AuthError('Nonce mismatch - potential replay attack')
 
     if payload.get('iss') not in ['https://accounts.google.com', 'accounts.google.com']:
-        raise HTTPException(status_code=400, detail='Invalid issuer')
+        raise AuthError('Invalid issuer')
 
     return payload
 
@@ -76,11 +81,38 @@ async def generate_aux_token(user: User) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def verify_aux_token(token: str) -> dict | None:
+async def verify_aux_token(token: str) -> UserBase | None:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        return payload
+        return UserBase.model_validate(payload)
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
         return None
+
+
+async def get_current_user(
+    authorization: Annotated[str | None, Header()] = None, db: AsyncSession = Depends(get_db)
+) -> User:
+    """Extract and verify bearer token, return current user from database"""
+    if not authorization:
+        raise AuthError('Missing authorization header')
+
+    scheme, _, token = authorization.partition(' ')
+
+    if scheme.lower() != 'bearer' or not token:
+        raise AuthError(
+            'Invalid authorization header format',
+        )
+
+    user_data = await verify_aux_token(token)
+    if not user_data:
+        raise AuthError('Invalid or expired token')
+
+    result = await db.execute(select(User).where(User.email == user_data.email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise AuthError('User not found')
+
+    return user

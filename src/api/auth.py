@@ -1,19 +1,22 @@
+import logging
 import secrets
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 from starlette.responses import RedirectResponse
 
 from cache import get_cache
 from conf import settings
 from dal import get_or_create_user, update_or_create_auth
-from db import User, get_db
-from schemas import UserRead
-from utils.auth import generate_aux_token, generate_oauth_redirect_uri, verify_aux_token, verify_id_token
+from db import get_db
+from errors import AuthError
+from schemas import ErrorResponse
+from utils.auth import generate_aux_token, generate_oauth_redirect_uri, verify_id_token
+
+logger = logging.getLogger('api.auth')
 
 router = APIRouter(prefix='/auth')
 
@@ -26,22 +29,39 @@ class TokenResponse(BaseModel):
     token: str
 
 
-@router.get('/login')
-async def login(redis: Redis = Depends(get_cache)):
-    uri = await generate_oauth_redirect_uri(redis)
+@router.get('/login', responses={302: {'description': 'Redirect to Google OAuth login'}})
+async def login(cache: Redis = Depends(get_cache)):
+    """
+    Request comes from FE to init login process via oauth2.0 and open id connect.
+    FE is redirected to selection of Google account.
+    """
+    uri = await generate_oauth_redirect_uri(cache)
     return RedirectResponse(uri, status_code=302)
 
 
-@router.get('/token')
-async def token(code: str, state: str, redis: Redis = Depends(get_cache), db: AsyncSession = Depends(get_db)):
+@router.get(
+    '/token',
+    responses={
+        302: {'description': 'Redirect to frontend with exchange code'},
+        401: {'description': 'Invalid state/nonce parameter or invalid cert issuer', 'model': ErrorResponse},
+    },
+)
+async def token(code: str, state: str, cache: Redis = Depends(get_cache), db: AsyncSession = Depends(get_db)):
+    """
+    After user has chosen a Google account, Google redirects us to BE
+    with the code that can be exchanged for access, refresh and id tokens.
+    From id token BE creates its own aux token to identify a user from FE.
+    Then redirects to FE with the code that can be exchanged for aux token.
+    """
     token_url = 'https://oauth2.googleapis.com/token'
 
-    nonce = await redis.get(f'oauth:state:{state}')
+    nonce = await cache.get(f'oauth:state:{state}')
 
     if not nonce:
-        raise HTTPException(status_code=400, detail='Invalid state')
+        logger.error('No nonce for %s', state)
+        raise HTTPException(status_code=401, detail='Invalid state')
 
-    await redis.delete(f'oauth:state:{state}')
+    await cache.delete(f'oauth:state:{state}')
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -63,7 +83,11 @@ async def token(code: str, state: str, redis: Redis = Depends(get_cache), db: As
     access_token = data['access_token']
     refresh_token = data.get('refresh_token', '')
 
-    id_token_payload = await verify_id_token(id_token, expected_nonce=nonce)
+    try:
+        id_token_payload = await verify_id_token(id_token, expected_nonce=nonce)
+    except AuthError as e:
+        logger.error('Could not verify id_token: %s', e)
+        raise
 
     user = await get_or_create_user(id_token_payload, db)
 
@@ -73,49 +97,24 @@ async def token(code: str, state: str, redis: Redis = Depends(get_cache), db: As
 
     exchange_code = secrets.token_urlsafe(32)
 
-    await redis.setex(f'auth:exchange:{exchange_code}', 60, aux_token)
+    await cache.setex(f'auth:exchange:{exchange_code}', 60, aux_token)
 
     return RedirectResponse(f'{settings.fe_url}?code={exchange_code}', status_code=302)
 
 
-@router.post('/exchange')
-async def exchange_token(body: CodePayload, redis: Redis = Depends(get_cache)) -> TokenResponse:
-    """Exchange one-time code for auth token"""
+@router.post(
+    '/exchange',
+    responses={400: {'description': 'Invalid code', 'model': ErrorResponse}},
+)
+async def exchange_token(body: CodePayload, cache: Redis = Depends(get_cache)) -> TokenResponse:
+    """Exchange one-time code for aux token"""
     code = body.code
-    aux_token = await redis.get(f'auth:exchange:{code}')
+    aux_token = await cache.get(f'auth:exchange:{code}')
 
     if not aux_token:
+        logger.error('No aux token for %s', code)
         raise HTTPException(status_code=400, detail='Invalid or expired code')
 
-    await redis.delete(f'auth:exchange:{code}')
+    await cache.delete(f'auth:exchange:{code}')
 
     return TokenResponse(token=aux_token)
-
-
-async def get_current_user(authorization: str = Header(None), db: AsyncSession = Depends(get_db)) -> User:
-    """Dependency to get current authenticated user from Bearer token"""
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Not authenticated')
-
-    if not authorization.startswith('Bearer '):
-        raise HTTPException(status_code=401, detail='Invalid authentication scheme')
-
-    token = authorization.replace('Bearer ', '')
-
-    payload = verify_aux_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail='Invalid or expired token')
-
-    stmt = select(User).where(User.id == payload['user_id'])
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail='User not found')
-
-    return user
-
-
-@router.get('/me')
-async def me(user: User = Depends(get_current_user)) -> UserRead:
-    return UserRead.model_validate(user)

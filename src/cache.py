@@ -7,7 +7,7 @@ from conf import settings
 redis_pool: ConnectionPool | None = None
 
 
-logger = logging.getLogger('default')
+logger = logging.getLogger('cache')
 
 
 async def get_cache() -> Redis:
