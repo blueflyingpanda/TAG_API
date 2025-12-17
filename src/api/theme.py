@@ -1,8 +1,10 @@
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
+from pydantic import BeforeValidator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -12,16 +14,33 @@ from dal import get_or_404
 from db import Theme, User, get_db
 from schemas import ErrorResponse
 from schemas.theme import ThemeDetailsResponse, ThemeListItem, ThemePayload
-from utils.auth import get_current_user
+from utils.oauth import get_current_user
+from validators import validate_language_alpha2
 
 logger = logging.getLogger('api.theme')
 
-router = APIRouter(prefix='/themes')
+router = APIRouter(prefix='/themes', tags=['Themes'])
+
+LanguageParam = Annotated[str | None, BeforeValidator(validate_language_alpha2)]
 
 
 @router.get('/', response_model=Page[ThemeListItem])
-async def get_themes(db: AsyncSession = Depends(get_db)):
-    query = select(Theme).order_by(Theme.id.desc())
+async def get_themes(
+    language: LanguageParam = None,
+    difficulty: int | None = Query(None, ge=1, le=5),
+    name: str | None = Query(None, max_length=255),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(Theme)
+
+    if language is not None:
+        query = query.where(Theme.language == language)
+    if difficulty is not None:
+        query = query.where(Theme.difficulty == difficulty)
+    if name is not None:
+        query = query.where(Theme.name.ilike(f'%{name}%'))
+
+    query = query.order_by(Theme.id.desc())
     return await paginate(db, query)
 
 

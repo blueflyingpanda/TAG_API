@@ -1,10 +1,10 @@
 from datetime import datetime
 
-import pycountry
 from pydantic import BaseModel, field_validator
 from sqlmodel import Field, SQLModel
 
 from schemas.user import UserBase
+from validators import validate_language_alpha2
 
 
 class ThemeDescription(BaseModel):
@@ -34,13 +34,7 @@ class ThemeBase(SQLModel):
     @field_validator('language')
     @classmethod
     def validate_language(cls, v: str) -> str:
-        """Validate compliance with ISO 639-1 alpha-2 codes ('en', 'ru' ...)"""
-        lang = v.lower()
-        try:
-            pycountry.languages.get(alpha_2=lang)
-            return lang
-        except (KeyError, AttributeError) as e:
-            raise ValueError(f'Invalid ISO 639-1 language code: {lang}') from e
+        return validate_language_alpha2(v)
 
 
 class ThemeDetailsResponse(ThemeBase):

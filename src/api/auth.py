@@ -14,11 +14,11 @@ from dal import get_or_create_user, update_or_create_auth
 from db import get_db
 from errors import AuthError
 from schemas import ErrorResponse
-from utils.auth import generate_aux_token, generate_oauth_redirect_uri, verify_id_token
+from utils.oauth import generate_aux_token, generate_oauth_redirect_uri, verify_id_token
 
 logger = logging.getLogger('api.auth')
 
-router = APIRouter(prefix='/auth')
+router = APIRouter(prefix='/auth', tags=['Authorization'])
 
 
 class CodePayload(BaseModel):

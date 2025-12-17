@@ -56,6 +56,7 @@ async def verify_id_token(id_token: str, expected_nonce: str) -> dict:
             'verify_aud': True,
             'verify_exp': True,
         },
+        leeway=60,
     )
 
     if payload.get('nonce') != expected_nonce:
