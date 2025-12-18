@@ -30,6 +30,7 @@ class ThemeBase(SQLModel):
     name: str = Field(max_length=255)
     language: str = Field(default='en', max_length=2)  # ISO 639 alpha-2
     difficulty: int = Field(default=1, ge=1, le=5)
+    verified: bool = False
 
     @field_validator('language')
     @classmethod
