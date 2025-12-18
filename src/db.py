@@ -25,6 +25,13 @@ class DbModel(SQLModel):
     )
 
 
+class UserToFavouriteThemes(SQLModel, table=True):
+    __tablename__ = 'user_to_favourite_themes'
+
+    user_id: int = Field(foreign_key='users.id', primary_key=True)
+    theme_id: int = Field(foreign_key='themes.id', primary_key=True)
+
+
 class User(DbModel, UserBase, table=True):
     __tablename__ = 'users'
 
@@ -40,6 +47,8 @@ class User(DbModel, UserBase, table=True):
     themes: list[Theme] = Relationship(back_populates='creator')
     games: list[Game] = Relationship(back_populates='starter')
 
+    favourite_themes: list[Theme] = Relationship(back_populates='favourited_by', link_model=UserToFavouriteThemes)
+
 
 class Auth(DbModel, table=True):
     __tablename__ = 'auths'
@@ -48,10 +57,7 @@ class Auth(DbModel, table=True):
     user: User = Relationship(back_populates='auth', sa_relationship_kwargs={'uselist': False})
 
     access_token: str | None
-    refresh_token: str | None
     id_token: str | None
-
-    aux_token: str | None
 
 
 class Theme(DbModel, ThemeBase, table=True):
@@ -70,6 +76,8 @@ class Theme(DbModel, ThemeBase, table=True):
 
     creator: User | None = Relationship(back_populates='themes')
     games: list[Game] = Relationship(back_populates='theme')
+
+    favourited_by: list[User] = Relationship(back_populates='favourite_themes', link_model=UserToFavouriteThemes)
 
 
 class Game(DbModel, table=True):

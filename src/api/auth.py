@@ -81,7 +81,6 @@ async def token(code: str, state: str, cache: Redis = Depends(get_cache), db: As
 
     id_token = data['id_token']
     access_token = data['access_token']
-    refresh_token = data.get('refresh_token', '')
 
     try:
         id_token_payload = await verify_id_token(id_token, expected_nonce=nonce)
@@ -91,12 +90,10 @@ async def token(code: str, state: str, cache: Redis = Depends(get_cache), db: As
 
     user = await get_or_create_user(id_token_payload, db)
 
-    aux_token = await generate_aux_token(user)
-
-    await update_or_create_auth(user, db, id_token, access_token, refresh_token, aux_token)
+    await update_or_create_auth(user, db, id_token, access_token)
 
     exchange_code = secrets.token_urlsafe(32)
-
+    aux_token = await generate_aux_token(user)
     await cache.setex(f'auth:exchange:{exchange_code}', 60, aux_token)
 
     return RedirectResponse(f'{settings.fe_url}?code={exchange_code}', status_code=302)

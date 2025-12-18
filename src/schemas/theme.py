@@ -39,10 +39,13 @@ class ThemeBase(SQLModel):
 
 class ThemeDetailsResponse(ThemeBase):
     id: int
+    public: bool
     description: ThemeDescription
     played_count: int = 0
     last_played: datetime | None = None
     creator: UserBase
+    likes: int = 0
+    favourite: bool = False
 
 
 class ThemeListItem(ThemeBase):
@@ -51,7 +54,14 @@ class ThemeListItem(ThemeBase):
     id: int
 
 
-class ThemePayload(ThemeBase):
+class ThemeCreatePayload(ThemeBase):
     """For theme creation"""
 
     description: ThemeDescription
+    public: bool = False
+
+
+class ThemeUpdatePayload(BaseModel):
+    """For theme update"""
+
+    public: bool = False
