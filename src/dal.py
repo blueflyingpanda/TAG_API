@@ -1,13 +1,14 @@
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, delete
+from sqlalchemy import Select, delete, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlmodel import or_, select
+from sqlmodel import asc, desc, or_, select
 
 from db import Auth, Theme, User, UserToFavouriteThemes
+from schemas.theme import ThemeOrderBy
 
 logger = logging.getLogger('dal')
 
@@ -67,6 +68,38 @@ async def get_available_themes(user: User) -> Select[Theme]:
     return select(Theme).where(or_(Theme.public, Theme.creator == user))
 
 
+async def apply_themes_ordering(
+    query: Select[Theme],
+    order_by: ThemeOrderBy = ThemeOrderBy.ID,
+    descending: bool = False,
+    joined: bool = False,
+) -> Select[Theme]:
+    order_func = desc if descending else asc
+
+    match order_by:
+        case ThemeOrderBy.ID:
+            query = query.order_by(order_func(Theme.id))
+        case ThemeOrderBy.NAME:
+            query = query.order_by(order_func(Theme.name))
+        case ThemeOrderBy.PLAYED_COUNT:
+            query = query.order_by(order_func(Theme.played_count))
+        case ThemeOrderBy.LAST_PLAYED:
+            if descending:
+                query = query.order_by(Theme.last_played.desc().nulls_last())
+            else:
+                query = query.order_by(Theme.last_played.asc().nulls_last())
+        case ThemeOrderBy.LIKES:
+            likes_count = (
+                select(func.count(UserToFavouriteThemes.user_id))
+                .where(UserToFavouriteThemes.theme_id == Theme.id)
+                .correlate(Theme)
+                .scalar_subquery()
+            )
+            query = query.order_by(order_func(likes_count))
+
+    return query
+
+
 async def get_filtered_themes(
     user: User,
     language: str | None,
@@ -96,7 +129,7 @@ async def get_filtered_themes(
     if name is not None:
         query = query.where(Theme.name.ilike(f'%{name}%'))
 
-    return query.order_by(Theme.id.desc())
+    return query
 
 
 async def add_to_favourite(db: AsyncSession, user: User, theme: Theme):

@@ -10,10 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import Response
 
-from dal import add_to_favourite, get_filtered_themes, get_theme_details, remove_from_favourite
+from dal import (
+    add_to_favourite,
+    apply_themes_ordering,
+    get_filtered_themes,
+    get_theme_details,
+    remove_from_favourite,
+)
 from db import Theme, User, get_db
 from schemas import ErrorResponse
-from schemas.theme import ThemeCreatePayload, ThemeDetailsResponse, ThemeListItem, ThemeUpdatePayload
+from schemas.theme import ThemeCreatePayload, ThemeDetailsResponse, ThemeListItem, ThemeOrderBy, ThemeUpdatePayload
 from utils.oauth import get_current_user
 from validators import validate_language_alpha2
 
@@ -42,10 +48,13 @@ async def get_themes(
     mine: bool = False,
     verified: bool = True,
     favourites: bool = False,
+    order: ThemeOrderBy = ThemeOrderBy.ID,
+    descending: bool = False,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     query = await get_filtered_themes(user, language, difficulty, name, mine, verified, favourites)
+    query = await apply_themes_ordering(query, order, descending)
     return await paginate(db, query)
 
 

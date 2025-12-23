@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, field_validator
 from sqlmodel import Field, SQLModel
@@ -66,3 +67,11 @@ class ThemeUpdatePayload(BaseModel):
     """For theme update"""
 
     public: bool = False
+
+
+class ThemeOrderBy(StrEnum):
+    ID = 'id'
+    NAME = 'name'
+    PLAYED_COUNT = 'played_count'
+    LAST_PLAYED = 'last_played'
+    LIKES = 'likes'
