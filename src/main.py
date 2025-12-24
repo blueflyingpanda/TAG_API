@@ -9,7 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from api import auth, theme
+from api import auth, game, theme
 from cache import close_cache, init_cache
 from db import get_db
 from errors import AuthError
@@ -38,6 +38,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(theme.router)
+app.include_router(game.router)
 
 add_pagination(app)
 

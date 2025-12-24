@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlmodel import asc, desc, or_, select
 
-from db import Auth, Theme, User, UserToFavouriteThemes
+from db import Auth, Game, Theme, User, UserToFavouriteThemes
+from schemas.game import GameOrderBy
 from schemas.theme import ThemeOrderBy
 
 logger = logging.getLogger('dal')
@@ -62,6 +63,17 @@ async def get_theme_details(db: AsyncSession, user: User, theme_id: int) -> Them
     return instance
 
 
+async def get_game_details(db: AsyncSession, user: User, game_id: int) -> Game:
+    result = await db.execute(
+        select(Game)
+        .where(Game.id == game_id, Game.starter == user)
+        .options(selectinload(Game.starter), selectinload(Game.theme))
+    )
+    instance = result.scalar_one_or_none()
+
+    return instance
+
+
 async def get_available_themes(user: User) -> Select[Theme]:
     if user.admin:
         return select(Theme)
@@ -72,7 +84,6 @@ async def apply_themes_ordering(
     query: Select[Theme],
     order_by: ThemeOrderBy = ThemeOrderBy.ID,
     descending: bool = False,
-    joined: bool = False,
 ) -> Select[Theme]:
     order_func = desc if descending else asc
 
@@ -146,3 +157,35 @@ async def remove_from_favourite(db: AsyncSession, user: User, theme: Theme):
 
     await db.execute(stmt)
     await db.commit()
+
+
+async def get_filtered_games(
+    user: User,
+    theme_id: int | None = None,
+    ended: bool = False,
+    skip_penalty: bool | None = None,
+) -> Select[Game]:
+    query = select(Game).where(Game.starter == user).options(selectinload(Game.theme))
+
+    if theme_id is not None:
+        query = query.where(Game.theme_id == theme_id)
+    if ended:
+        query = query.where(Game.ended_at is not None)
+    if skip_penalty is not None:
+        query = query.where(Game.skip_penalty == skip_penalty)
+
+    return query
+
+
+async def apply_games_ordering(
+    query: Select[Game],
+    order_by: GameOrderBy = GameOrderBy.ID,
+    descending: bool = False,
+) -> Select[Game]:
+    order_func = desc if descending else asc
+
+    match order_by:
+        case GameOrderBy.ID:
+            query = query.order_by(order_func(Game.id))
+
+    return query

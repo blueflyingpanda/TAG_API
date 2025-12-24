@@ -7,8 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlmodel import Field, Relationship, SQLModel
 
 from conf import settings
-from schemas.theme import ThemeBase
-from schemas.user import UserBase
 
 
 class DbModel(SQLModel):
@@ -32,10 +30,12 @@ class UserToFavouriteThemes(SQLModel, table=True):
     theme_id: int = Field(foreign_key='themes.id', primary_key=True)
 
 
-class User(DbModel, UserBase, table=True):
+class User(DbModel, table=True):
     __tablename__ = 'users'
 
-    email: str = Field(max_length=255, unique=True, index=True)
+    email: str = Field(max_length=255, unique=True)
+    picture: str = ''
+    admin: bool = Field(default=False)
 
     last_login: datetime | None = Field(
         default=None,
@@ -60,10 +60,11 @@ class Auth(DbModel, table=True):
     id_token: str | None
 
 
-class Theme(DbModel, ThemeBase, table=True):
+class Theme(DbModel, table=True):
     __tablename__ = 'themes'
 
-    name: str = Field(max_length=255, unique=True, index=True)
+    name: str = Field(max_length=255, unique=True)
+    language: str = Field(default='en', max_length=2)  # ISO 639 alpha-2
     description: dict | None = Field(default=None, sa_column=Column(JSONB))
     played_count: int = Field(default=0)
     last_played: datetime | None = Field(
@@ -72,6 +73,7 @@ class Theme(DbModel, ThemeBase, table=True):
     )
     created_by: int | None = Field(default=None, foreign_key='users.id')
     public: bool = Field(default=False)
+    difficulty: int = Field(default=1, ge=1, le=5)
     verified: bool = Field(default=False)
 
     creator: User | None = Relationship(back_populates='themes')
