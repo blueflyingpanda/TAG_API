@@ -2,26 +2,6 @@
 
 A robust, scalable REST API backend for **Themed Alias Game (TAG)**, a modern web-based implementation of the popular word-guessing game Alias. This API manages authentication, theme management, game state, and multiplayer game sessions.
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Environment Setup](#environment-setup)
-  - [Running the API](#running-the-api)
-- [API Documentation](#api-documentation)
-  - [Authentication](#authentication)
-  - [Themes Management](#themes-management)
-  - [Games Management](#games-management)
-- [Database](#database)
-- [Architecture](#architecture)
-- [Development](#development)
-- [Contributing](#contributing)
-- [License](#license)
-
 ## 🎮 Overview
 
 TAG_API is the backend service powering the Themed Alias Game. It provides comprehensive REST API endpoints for:
