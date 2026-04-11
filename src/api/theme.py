@@ -43,7 +43,6 @@ async def get_theme_or_404(db: AsyncSession, theme_id: int, user: User) -> Theme
 @router.get('/', response_model=Page[ThemeListItem])
 async def get_themes(
     language: LanguageParam = None,
-    difficulty: int | None = Query(None, ge=1, le=5),
     name: str | None = Query(None, max_length=255),
     mine: bool = False,
     verified: bool = True,
@@ -53,7 +52,7 @@ async def get_themes(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    query = await get_filtered_themes(user, language, difficulty, name, mine, verified, favourites)
+    query = await get_filtered_themes(user, language, name, mine, verified, favourites)
     query = await apply_themes_ordering(query, order, descending)
     return await paginate(db, query)
 

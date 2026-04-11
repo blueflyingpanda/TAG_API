@@ -1,4 +1,3 @@
-from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, field_validator
@@ -8,15 +7,20 @@ from schemas.user import UserBase
 from validators import validate_language_alpha2
 
 
+class WordInfo(BaseModel):
+    difficulty: int = Field(ge=1, le=5)
+
+
 class ThemeDescription(BaseModel):
-    words: list[str]
+    words: dict[str, WordInfo]
     teams: list[str]
 
     @field_validator('words')
     @classmethod
-    def validate_words(cls, v: list[str]) -> list[str]:
-        if len(v) < 100:
-            raise ValueError('At least 100 words are required')
+    def validate_words(cls, v: dict[str, WordInfo]) -> dict[str, WordInfo]:
+        easy_count = sum(1 for w in v.values() if w.difficulty == 1)
+        if easy_count < 30:
+            raise ValueError('At least 30 words with difficulty 1 are required')
         return v
 
     @field_validator('teams')
@@ -30,7 +34,6 @@ class ThemeDescription(BaseModel):
 class ThemeBase(SQLModel):
     name: str = Field(max_length=255)
     language: str = Field(default='en', max_length=2)  # ISO 639 alpha-2
-    difficulty: int = Field(default=1, ge=1, le=5)
     verified: bool = False
 
     @field_validator('language')
@@ -43,8 +46,6 @@ class ThemeDetailsResponse(ThemeBase):
     id: int
     public: bool
     description: ThemeDescription
-    played_count: int = 0
-    last_played: datetime | None = None
     creator: UserBase
     likes: int = 0
     favourite: bool = False
@@ -72,6 +73,4 @@ class ThemeUpdatePayload(BaseModel):
 class ThemeOrderBy(StrEnum):
     ID = 'id'
     NAME = 'name'
-    PLAYED_COUNT = 'played_count'
-    LAST_PLAYED = 'last_played'
     LIKES = 'likes'

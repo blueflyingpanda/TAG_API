@@ -66,14 +66,8 @@ class Theme(DbModel, table=True):
     name: str = Field(max_length=255, unique=True)
     language: str = Field(default='en', max_length=2)  # ISO 639 alpha-2
     description: dict | None = Field(default=None, sa_column=Column(JSONB))
-    played_count: int = Field(default=0)
-    last_played: datetime | None = Field(
-        default=None,
-        sa_type=DateTime(timezone=True),
-    )
     created_by: int | None = Field(default=None, foreign_key='users.id')
     public: bool = Field(default=False)
-    difficulty: int = Field(default=1, ge=1, le=5)
     verified: bool = Field(default=False)
 
     creator: User | None = Relationship(back_populates='themes')

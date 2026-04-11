@@ -92,13 +92,6 @@ async def apply_themes_ordering(
             query = query.order_by(order_func(Theme.id))
         case ThemeOrderBy.NAME:
             query = query.order_by(order_func(Theme.name))
-        case ThemeOrderBy.PLAYED_COUNT:
-            query = query.order_by(order_func(Theme.played_count))
-        case ThemeOrderBy.LAST_PLAYED:
-            if descending:
-                query = query.order_by(Theme.last_played.desc().nulls_last())
-            else:
-                query = query.order_by(Theme.last_played.asc().nulls_last())
         case ThemeOrderBy.LIKES:
             likes_count = (
                 select(func.count(UserToFavouriteThemes.user_id))
@@ -114,7 +107,6 @@ async def apply_themes_ordering(
 async def get_filtered_themes(
     user: User,
     language: str | None,
-    difficulty: int | None,
     name: str | None,
     mine: bool,
     verified: bool,
@@ -135,8 +127,6 @@ async def get_filtered_themes(
 
     if language is not None:
         query = query.where(Theme.language == language)
-    if difficulty is not None:
-        query = query.where(Theme.difficulty == difficulty)
     if name is not None:
         query = query.where(Theme.name.ilike(f'%{name}%'))
 
