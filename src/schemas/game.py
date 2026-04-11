@@ -14,7 +14,7 @@ class GameBase(SQLModel):
     points: int
     round: int
     skip_penalty: bool
-    difficulty: int = 5
+    difficulty: int
 
 
 class GameListItem(GameBase):
