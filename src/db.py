@@ -90,6 +90,7 @@ class Game(DbModel, table=True):
     points: int
     round: int = Field(default=30)
     skip_penalty: bool = Field(default=True)
+    difficulty: int = Field(default=5)
     words_guessed: list = Field(default_factory=list, sa_column=Column(JSONB))
     words_skipped: list = Field(default_factory=list, sa_column=Column(JSONB))
 
