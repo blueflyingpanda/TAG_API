@@ -1,0 +1,14 @@
+services:
+  # postgres, redis, and nginx are reused from another application, so we only define the API service here
+  api:
+    build: .
+    restart: always
+    env_file: .env
+    expose:
+      - "8080"
+    networks:
+      - shared
+
+networks:
+  shared:
+    external: true
