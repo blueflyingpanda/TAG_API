@@ -26,5 +26,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str
     jwt_expires_in_days: int
 
+    tg_bot_token: str
+
 
 settings = Settings()

@@ -1,5 +1,10 @@
+import hashlib
+import hmac
+import json
 import secrets
+import time
 import urllib.parse
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -14,6 +19,8 @@ from conf import settings
 from db import User, get_db
 from errors import AuthError
 from schemas.user import UserBase
+
+DAY_IN_SECONDS = 86400
 
 
 async def generate_oauth_redirect_uri(redis: Redis) -> str:
@@ -73,6 +80,7 @@ async def generate_aux_token(user: User) -> str:
     payload = {
         'user_id': user.id,
         'email': user.email,
+        'username': user.username,
         'picture': user.picture,
         'admin': user.admin,
         'exp': datetime.now(UTC) + timedelta(days=settings.jwt_expires_in_days),
@@ -110,10 +118,59 @@ async def get_current_user(
     if not user_data:
         raise AuthError('Invalid or expired token')
 
-    result = await db.execute(select(User).where(User.email == user_data.email))
+    result = await db.execute(select(User).where(User.id == user_data.user_id))
     user = result.scalar_one_or_none()
 
     if not user:
         raise AuthError('User not found')
 
     return user
+
+
+@dataclass(frozen=True, slots=True)
+class TelegramUser:
+    id: int
+    first_name: str
+    last_name: str = ''
+    username: str = ''
+    photo_url: str = ''
+    language_code: str = ''
+    is_premium: bool = False
+
+    @property
+    def display_name(self) -> str:
+        if self.username:
+            return self.username
+        return f'{self.first_name} {self.last_name}'.strip()
+
+
+def verify_telegram_init_data(init_data: str) -> TelegramUser:
+    """Verify Telegram Mini App initData HMAC signature and return parsed user data."""
+    parsed = dict(urllib.parse.parse_qsl(init_data, strict_parsing=True))
+    hash_value = parsed.pop('hash', None)
+
+    if not hash_value:
+        raise AuthError('Missing hash in initData')
+
+    data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(parsed.items()))
+
+    secret_key = hmac.new(b'WebAppData', settings.tg_bot_token.encode(), hashlib.sha256).digest()
+    expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(expected_hash, hash_value):
+        raise AuthError('Invalid initData signature')
+
+    auth_date = int(parsed.get('auth_date', 0))
+    if time.time() - auth_date > DAY_IN_SECONDS:
+        raise AuthError('initData expired')
+
+    raw = json.loads(parsed['user'])
+    return TelegramUser(
+        id=raw['id'],
+        first_name=raw['first_name'],
+        last_name=raw.get('last_name', ''),
+        username=raw.get('username', ''),
+        photo_url=raw.get('photo_url', ''),
+        language_code=raw.get('language_code', ''),
+        is_premium=raw.get('is_premium', False),
+    )

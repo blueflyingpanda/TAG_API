@@ -10,8 +10,32 @@ from sqlmodel import asc, desc, or_, select
 from db import Auth, Game, Theme, User, UserToFavouriteThemes
 from schemas.game import GameOrderBy
 from schemas.theme import ThemeOrderBy
+from utils.oauth import TelegramUser
 
 logger = logging.getLogger('dal')
+
+
+async def get_or_create_telegram_user(tg_user: TelegramUser, db: AsyncSession) -> User:
+    stmt = select(User).where(User.telegram_id == tg_user.id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        user = User(
+            telegram_id=tg_user.id,
+            username=tg_user.display_name,
+            picture=tg_user.photo_url,
+            last_login=datetime.now(UTC),
+        )
+        db.add(user)
+    else:
+        user.username = tg_user.display_name
+        user.picture = tg_user.photo_url or ''
+        user.last_login = datetime.now(UTC)
+
+    await db.commit()
+    await db.refresh(user)
+    return user
 
 
 async def get_or_create_user(id_token_payload: dict, db: AsyncSession) -> User:

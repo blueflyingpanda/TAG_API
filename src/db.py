@@ -33,7 +33,9 @@ class UserToFavouriteThemes(SQLModel, table=True):
 class User(DbModel, table=True):
     __tablename__ = 'users'
 
-    email: str = Field(max_length=255, unique=True)
+    email: str | None = Field(default=None, max_length=255, unique=True)
+    telegram_id: int | None = Field(default=None, unique=True)
+    username: str | None = Field(default=None, max_length=255)
     picture: str = ''
     admin: bool = Field(default=False)
 

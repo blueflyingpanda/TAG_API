@@ -2,6 +2,8 @@ from sqlmodel import SQLModel
 
 
 class UserBase(SQLModel):
-    email: str
+    user_id: int
+    email: str | None = None
+    username: str | None = None
     picture: str = ''
     admin: bool = False

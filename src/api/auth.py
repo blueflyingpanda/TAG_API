@@ -10,11 +10,11 @@ from starlette.responses import RedirectResponse
 
 from cache import get_cache
 from conf import settings
-from dal import get_or_create_user, update_or_create_auth
+from dal import get_or_create_telegram_user, get_or_create_user, update_or_create_auth
 from db import get_db
 from errors import AuthError
 from schemas import ErrorResponse
-from utils.oauth import generate_aux_token, generate_oauth_redirect_uri, verify_id_token
+from utils.oauth import generate_aux_token, generate_oauth_redirect_uri, verify_id_token, verify_telegram_init_data
 
 logger = logging.getLogger('api.auth')
 
@@ -97,6 +97,28 @@ async def token(code: str, state: str, cache: Redis = Depends(get_cache), db: As
     await cache.setex(f'auth:exchange:{exchange_code}', 60, aux_token)
 
     return RedirectResponse(f'{settings.fe_url}?code={exchange_code}', status_code=302)
+
+
+class TelegramPayload(BaseModel):
+    init_data: str
+
+
+@router.post(
+    '/telegram',
+    responses={401: {'description': 'Invalid or expired initData', 'model': ErrorResponse}},
+)
+async def telegram_login(body: TelegramPayload, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+    """Authenticate via Telegram Mini App initData."""
+    try:
+        tg_user = verify_telegram_init_data(body.init_data)
+    except AuthError as e:
+        logger.error('Telegram auth failed: %s', e)
+        raise
+
+    user = await get_or_create_telegram_user(tg_user, db)
+    aux_token = await generate_aux_token(user)
+
+    return TokenResponse(token=aux_token)
 
 
 @router.post(
