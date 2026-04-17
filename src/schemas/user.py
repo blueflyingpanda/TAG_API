@@ -7,3 +7,11 @@ class UserBase(SQLModel):
     username: str | None = None
     picture: str = ''
     admin: bool = False
+
+
+class UserResponse(SQLModel):
+    id: int
+    email: str | None = None
+    username: str | None = None
+    picture: str = ''
+    admin: bool = False

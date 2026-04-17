@@ -3,7 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, field_validator
 from sqlmodel import Field, SQLModel
 
-from schemas.user import UserBase
+from schemas.user import UserResponse
 from validators import validate_language_alpha2
 
 
@@ -46,7 +46,7 @@ class ThemeDetailsResponse(ThemeBase):
     id: int
     public: bool
     description: ThemeDescription
-    creator: UserBase
+    creator: UserResponse
     likes: int = 0
     favourite: bool = False
 
