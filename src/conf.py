@@ -28,5 +28,7 @@ class Settings(BaseSettings):
 
     tg_bot_token: str
 
+    debug: bool = False
+
 
 settings = Settings()

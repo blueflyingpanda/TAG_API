@@ -11,6 +11,7 @@ from starlette.responses import JSONResponse
 
 from api import auth, game, theme
 from cache import close_cache, init_cache
+from conf import settings
 from db import get_db
 from errors import AuthError
 from log import init_logging
@@ -26,7 +27,10 @@ async def lifespan(app: FastAPI):
     await close_cache()
 
 
-app = FastAPI(lifespan=lifespan)
+docs_url = '/docs' if settings.debug else None
+redoc_url = '/redoc' if settings.debug else None
+
+app = FastAPI(lifespan=lifespan, docs_url=docs_url, redoc_url=redoc_url)
 
 app.add_middleware(
     CORSMiddleware,
