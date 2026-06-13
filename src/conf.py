@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     oauth_redirect_uri: str
 
     fe_url: str
+    mobile_redirect_uri: str = 'tag://auth'
 
     jwt_secret: str
     jwt_algorithm: str

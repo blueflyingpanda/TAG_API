@@ -23,11 +23,13 @@ from schemas.user import UserBase
 DAY_IN_SECONDS = 86400
 
 
-async def generate_oauth_redirect_uri(redis: Redis) -> str:
+async def generate_oauth_redirect_uri(redis: Redis, final_redirect_uri: str | None = None) -> str:
     state = secrets.token_urlsafe(64)
     nonce = secrets.token_urlsafe(64)
 
     await redis.setex(f'oauth:state:{state}', timedelta(minutes=5), nonce)
+    if final_redirect_uri:
+        await redis.setex(f'oauth:redirect:{state}', timedelta(minutes=5), final_redirect_uri)
 
     query_params = {
         'client_id': settings.oauth_gcloud_id,

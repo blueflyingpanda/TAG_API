@@ -30,12 +30,18 @@ class TokenResponse(BaseModel):
 
 
 @router.get('/login', responses={302: {'description': 'Redirect to Google OAuth login'}})
-async def login(cache: Redis = Depends(get_cache)):
+async def login(redirect_uri: str | None = None, cache: Redis = Depends(get_cache)):
     """
     Request comes from FE to init login process via oauth2.0 and open id connect.
     FE is redirected to selection of Google account.
+
+    Mobile clients pass ?redirect_uri=tag://auth (allowlisted) to receive
+    the exchange code via deep link instead of the web FE redirect.
     """
-    uri = await generate_oauth_redirect_uri(cache)
+    if redirect_uri is not None and redirect_uri != settings.mobile_redirect_uri:
+        raise HTTPException(status_code=400, detail='Invalid redirect_uri')
+
+    uri = await generate_oauth_redirect_uri(cache, final_redirect_uri=redirect_uri)
     return RedirectResponse(uri, status_code=302)
 
 
@@ -95,6 +101,14 @@ async def token(code: str, state: str, cache: Redis = Depends(get_cache), db: As
     exchange_code = secrets.token_urlsafe(32)
     aux_token = await generate_aux_token(user)
     await cache.setex(f'auth:exchange:{exchange_code}', 60, aux_token)
+
+    # Mobile clients registered a deep-link redirect during /login
+    final_redirect = await cache.get(f'oauth:redirect:{state}')
+    await cache.delete(f'oauth:redirect:{state}')
+    if final_redirect:
+        if isinstance(final_redirect, bytes):
+            final_redirect = final_redirect.decode()
+        return RedirectResponse(f'{final_redirect}?code={exchange_code}', status_code=302)
 
     return RedirectResponse(f'{settings.fe_url}?code={exchange_code}', status_code=302)
 
