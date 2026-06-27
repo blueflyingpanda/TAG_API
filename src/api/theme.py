@@ -19,7 +19,14 @@ from dal import (
 )
 from db import Theme, User, get_db
 from schemas import ErrorResponse
-from schemas.theme import ThemeCreatePayload, ThemeDetailsResponse, ThemeListItem, ThemeOrderBy, ThemeUpdatePayload
+from schemas.theme import (
+    ThemeCreatePayload,
+    ThemeDetailsResponse,
+    ThemeListItem,
+    ThemeOrderBy,
+    ThemePublicityPayload,
+    ThemeUpdatePayload,
+)
 from utils.oauth import get_current_user
 from validators import validate_language_alpha2
 
@@ -106,6 +113,29 @@ async def create_theme(
 async def update_theme(
     theme_id: int,
     theme_info: ThemeUpdatePayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ThemeDetailsResponse:
+    theme = await get_theme_or_404(db, theme_id, user)
+    theme.description = theme_info.description
+
+    db.add(theme)
+    await db.commit()
+    await db.refresh(theme)
+
+    return ThemeDetailsResponse.model_validate(
+        theme, update={'likes': len(theme.favourited_by), 'favourite': user in theme.favourited_by}
+    )
+
+
+@router.patch(
+    '/{theme_id}',
+    response_model=ThemeDetailsResponse,
+    responses={404: {'description': 'Theme not found', 'model': ErrorResponse}},
+)
+async def make_theme_public(
+    theme_id: int,
+    theme_info: ThemePublicityPayload,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ThemeDetailsResponse:

@@ -64,10 +64,16 @@ class ThemeCreatePayload(ThemeBase):
     public: bool = False
 
 
+class ThemePublicityPayload(BaseModel):
+    """For theme public/private setting"""
+
+    public: bool = False
+
+
 class ThemeUpdatePayload(BaseModel):
     """For theme update"""
 
-    public: bool = False
+    description: ThemeDescription
 
 
 class ThemeOrderBy(StrEnum):

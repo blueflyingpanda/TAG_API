@@ -10,6 +10,6 @@ migrate:
 	alembic upgrade head
 
 test:
-	python -m pytest tests
+	PYTHONPATH=src uv run -m pytest tests
 
 .PHONY: migration migrate test
