@@ -132,7 +132,7 @@ async def update_theme(
     user: User = Depends(get_current_user),
 ) -> ThemeDetailsResponse:
     theme = await get_theme_for_update_or_404(db, theme_id, user)
-    theme.description = theme_info.description
+    theme.description = theme_info.description.model_dump()
 
     db.add(theme)
     await db.commit()
