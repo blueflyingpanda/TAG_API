@@ -47,6 +47,18 @@ async def get_theme_or_404(db: AsyncSession, theme_id: int, user: User) -> Theme
     return theme
 
 
+async def get_theme_for_update_or_404(db: AsyncSession, theme_id: int, user: User) -> Theme:
+    theme = await get_theme_or_404(db, theme_id, user)
+
+    if not user.admin and theme.created_by != user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f'{Theme.__name__} with id {theme_id} cannot be changed by user {user.id}',
+        )
+
+    return Theme
+
+
 @router.get('/', response_model=Page[ThemeListItem])
 async def get_themes(
     language: LanguageParam = None,
@@ -108,7 +120,10 @@ async def create_theme(
 @router.put(
     '/{theme_id}',
     response_model=ThemeDetailsResponse,
-    responses={404: {'description': 'Theme not found', 'model': ErrorResponse}},
+    responses={
+        403: {'description': 'User cannot change specified theme', 'model': ErrorResponse},
+        404: {'description': 'Theme not found', 'model': ErrorResponse},
+    },
 )
 async def update_theme(
     theme_id: int,
@@ -116,7 +131,7 @@ async def update_theme(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ThemeDetailsResponse:
-    theme = await get_theme_or_404(db, theme_id, user)
+    theme = await get_theme_for_update_or_404(db, theme_id, user)
     theme.description = theme_info.description
 
     db.add(theme)
@@ -131,7 +146,10 @@ async def update_theme(
 @router.patch(
     '/{theme_id}',
     response_model=ThemeDetailsResponse,
-    responses={404: {'description': 'Theme not found', 'model': ErrorResponse}},
+    responses={
+        403: {'description': 'User cannot change specified theme', 'model': ErrorResponse},
+        404: {'description': 'Theme not found', 'model': ErrorResponse},
+    },
 )
 async def change_theme_visibility(
     theme_id: int,
@@ -139,7 +157,7 @@ async def change_theme_visibility(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ThemeDetailsResponse:
-    theme = await get_theme_or_404(db, theme_id, user)
+    theme = await get_theme_for_update_or_404(db, theme_id, user)
     theme.public = theme_info.public
 
     db.add(theme)
