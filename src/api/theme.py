@@ -56,7 +56,7 @@ async def get_theme_for_update_or_404(db: AsyncSession, theme_id: int, user: Use
             detail=f'{Theme.__name__} with id {theme_id} cannot be changed by user {user.id}',
         )
 
-    return Theme
+    return theme
 
 
 @router.get('/', response_model=Page[ThemeListItem])
