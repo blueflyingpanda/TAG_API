@@ -24,8 +24,8 @@ from schemas.theme import (
     ThemeDetailsResponse,
     ThemeListItem,
     ThemeOrderBy,
-    ThemePublicityPayload,
     ThemeUpdatePayload,
+    ThemeVisibilityPayload,
 )
 from utils.oauth import get_current_user
 from validators import validate_language_alpha2
@@ -133,9 +133,9 @@ async def update_theme(
     response_model=ThemeDetailsResponse,
     responses={404: {'description': 'Theme not found', 'model': ErrorResponse}},
 )
-async def make_theme_public(
+async def change_theme_visibility(
     theme_id: int,
-    theme_info: ThemePublicityPayload,
+    theme_info: ThemeVisibilityPayload,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ThemeDetailsResponse:

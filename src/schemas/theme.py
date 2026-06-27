@@ -64,7 +64,7 @@ class ThemeCreatePayload(ThemeBase):
     public: bool = False
 
 
-class ThemePublicityPayload(BaseModel):
+class ThemeVisibilityPayload(BaseModel):
     """For theme public/private setting"""
 
     public: bool = False
