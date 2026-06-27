@@ -50,7 +50,7 @@ async def get_theme_or_404(db: AsyncSession, theme_id: int, user: User) -> Theme
 async def get_theme_for_update_or_404(db: AsyncSession, theme_id: int, user: User) -> Theme:
     theme = await get_theme_or_404(db, theme_id, user)
 
-    if not user.admin and theme.created_by != user:
+    if not user.admin and theme.created_by != user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f'{Theme.__name__} with id {theme_id} cannot be changed by user {user.id}',
