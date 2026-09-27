@@ -45,14 +45,17 @@ async def generate_oauth_redirect_uri(redis: Redis, final_redirect_uri: str | No
     return f'{base_url}?{query_string}'
 
 
-async def verify_id_token(id_token: str, expected_nonce: str) -> dict:
-    """Verify Google ID token signature and nonce"""
+async def verify_id_token(id_token: str, expected_nonce: str | None = None) -> dict:
+    """Verify Google ID token signature; verify nonce only when one is expected.
 
-    # Get the signing key from Google's JWKS endpoint
+    Native sign-in flows (Android/iOS Google Sign-In SDK) obtain the ID token
+    directly from Google and do not involve a server-issued nonce, so callers
+    that trust the token's provenance pass ``expected_nonce=None``.
+    """
+
     jwks_url = 'https://www.googleapis.com/oauth2/v3/certs'
     jwks_client = PyJWKClient(jwks_url)
 
-    # Get the signing key from the token header
     signing_key = jwks_client.get_signing_key_from_jwt(id_token)
 
     payload = jwt.decode(
@@ -68,7 +71,7 @@ async def verify_id_token(id_token: str, expected_nonce: str) -> dict:
         leeway=60,
     )
 
-    if payload.get('nonce') != expected_nonce:
+    if expected_nonce is not None and payload.get('nonce') != expected_nonce:
         raise AuthError('Nonce mismatch - potential replay attack')
 
     if payload.get('iss') not in ['https://accounts.google.com', 'accounts.google.com']:

@@ -113,6 +113,31 @@ async def token(code: str, state: str, cache: Redis = Depends(get_cache), db: As
     return RedirectResponse(f'{settings.fe_url}?code={exchange_code}', status_code=302)
 
 
+class GoogleNativePayload(BaseModel):
+    id_token: str
+
+
+@router.post(
+    '/google',
+    responses={401: {'description': 'Invalid Google ID token', 'model': ErrorResponse}},
+)
+async def google_native_login(body: GoogleNativePayload, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+    """Authenticate a native mobile client that used Google Sign-In SDK.
+
+    The client obtains an ID token from Google directly and posts it here.
+    We verify signature/audience/issuer/expiry and issue our aux token.
+    """
+    try:
+        payload = await verify_id_token(body.id_token, expected_nonce=None)
+    except AuthError as e:
+        logger.error('Native Google auth failed: %s', e)
+        raise
+
+    user = await get_or_create_user(payload, db)
+    aux_token = await generate_aux_token(user)
+    return TokenResponse(token=aux_token)
+
+
 class TelegramPayload(BaseModel):
     init_data: str
 
