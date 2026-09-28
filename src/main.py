@@ -34,7 +34,12 @@ app = FastAPI(lifespan=lifespan, docs_url=docs_url, redoc_url=redoc_url)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://blueflyingpanda.github.io'],
+    allow_origins=[
+        'https://blueflyingpanda.github.io',
+        # Capacitor's WebView origins for the native mobile app.
+        'https://localhost',  # Android (androidScheme: "https")
+        'capacitor://localhost',  # iOS default
+    ],
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
