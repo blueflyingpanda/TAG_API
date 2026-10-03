@@ -1,7 +1,7 @@
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, delete, func
+from sqlalchemy import Select, delete, func, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -170,6 +170,27 @@ async def remove_from_favourite(db: AsyncSession, user: User, theme: Theme):
     )
 
     await db.execute(stmt)
+    await db.commit()
+
+
+async def delete_user(db: AsyncSession, user: User):
+    """Delete an account (Google Play account-deletion requirement).
+
+    Removes the user's login record, games, favourites and private themes.
+    Public themes stay playable for everyone, with the author removed.
+    """
+    private_theme_ids = select(Theme.id).where(Theme.created_by == user.id, Theme.public.is_(False))
+
+    await db.execute(delete(UserToFavouriteThemes).where(UserToFavouriteThemes.user_id == user.id))
+    await db.execute(delete(Game).where(Game.started_by == user.id))
+
+    await db.execute(delete(UserToFavouriteThemes).where(UserToFavouriteThemes.theme_id.in_(private_theme_ids)))
+    await db.execute(update(Game).where(Game.theme_id.in_(private_theme_ids)).values(theme_id=None))
+    await db.execute(delete(Theme).where(Theme.created_by == user.id, Theme.public.is_(False)))
+    await db.execute(update(Theme).where(Theme.created_by == user.id).values(created_by=None))
+
+    await db.execute(delete(Auth).where(Auth.user_id == user.id))
+    await db.execute(delete(User).where(User.id == user.id))
     await db.commit()
 
 

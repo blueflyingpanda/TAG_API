@@ -2,7 +2,7 @@ import logging
 import secrets
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,11 +10,17 @@ from starlette.responses import RedirectResponse
 
 from cache import get_cache
 from conf import settings
-from dal import get_or_create_telegram_user, get_or_create_user, update_or_create_auth
-from db import get_db
+from dal import delete_user, get_or_create_telegram_user, get_or_create_user, update_or_create_auth
+from db import User, get_db
 from errors import AuthError
 from schemas import ErrorResponse
-from utils.oauth import generate_aux_token, generate_oauth_redirect_uri, verify_id_token, verify_telegram_init_data
+from utils.oauth import (
+    generate_aux_token,
+    generate_oauth_redirect_uri,
+    get_current_user,
+    verify_id_token,
+    verify_telegram_init_data,
+)
 
 logger = logging.getLogger('api.auth')
 
@@ -176,3 +182,19 @@ async def exchange_token(body: CodePayload, cache: Redis = Depends(get_cache)) -
     await cache.delete(f'auth:exchange:{code}')
 
     return TokenResponse(token=aux_token)
+
+
+@router.delete(
+    '/me',
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={401: {'description': 'Missing or invalid token', 'model': ErrorResponse}},
+)
+async def delete_account(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Permanently delete the current user's account and personal data.
+
+    Public themes they created are kept (author removed); existing aux tokens
+    stop working because the user no longer exists.
+    """
+    logger.info('Deleting account %s', user.id)
+    await delete_user(db, user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
