@@ -77,7 +77,7 @@ async def update_or_create_auth(user: User, db: AsyncSession, id_token: str, acc
     return auth
 
 
-async def get_theme_details(db: AsyncSession, user: User, theme_id: int) -> Theme:
+async def get_theme_details(db: AsyncSession, user: User | None, theme_id: int) -> Theme:
     query = await get_available_themes(user)
     result = await db.execute(
         query.where(Theme.id == theme_id).options(selectinload(Theme.creator), selectinload(Theme.favourited_by))
@@ -98,7 +98,9 @@ async def get_game_details(db: AsyncSession, user: User, game_id: int) -> Game:
     return instance
 
 
-async def get_available_themes(user: User) -> Select[Theme]:
+async def get_available_themes(user: User | None) -> Select[Theme]:
+    if user is None:
+        return select(Theme).where(Theme.public)
     if user.admin:
         return select(Theme)
     return select(Theme).where(or_(Theme.public, Theme.creator == user))
@@ -129,7 +131,7 @@ async def apply_themes_ordering(
 
 
 async def get_filtered_themes(
-    user: User,
+    user: User | None,
     language: str | None,
     name: str | None,
     mine: bool,

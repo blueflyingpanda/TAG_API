@@ -132,6 +132,15 @@ async def get_current_user(
     return user
 
 
+async def get_optional_user(
+    authorization: Annotated[str | None, Header()] = None, db: AsyncSession = Depends(get_db)
+) -> User | None:
+    """Like get_current_user, but anonymous requests (no header) get None"""
+    if not authorization:
+        return None
+    return await get_current_user(authorization, db)
+
+
 @dataclass(frozen=True, slots=True)
 class TelegramUser:
     id: int

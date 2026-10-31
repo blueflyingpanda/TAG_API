@@ -18,6 +18,7 @@ from dal import (
     remove_from_favourite,
 )
 from db import Theme, User, get_db
+from errors import AuthError
 from schemas import ErrorResponse
 from schemas.theme import (
     ThemeCreatePayload,
@@ -27,7 +28,7 @@ from schemas.theme import (
     ThemeUpdatePayload,
     ThemeVisibilityPayload,
 )
-from utils.oauth import get_current_user
+from utils.oauth import get_current_user, get_optional_user
 from validators import validate_language_alpha2
 
 logger = logging.getLogger('api.theme')
@@ -37,7 +38,7 @@ router = APIRouter(prefix='/themes', tags=['Themes'])
 LanguageParam = Annotated[str | None, BeforeValidator(validate_language_alpha2)]
 
 
-async def get_theme_or_404(db: AsyncSession, theme_id: int, user: User) -> Theme:
+async def get_theme_or_404(db: AsyncSession, theme_id: int, user: User | None) -> Theme:
     theme = await get_theme_details(db, user, theme_id)
     if not theme:
         logger.error('No such %s: %r', Theme, theme_id)
@@ -69,8 +70,10 @@ async def get_themes(
     order: ThemeOrderBy = ThemeOrderBy.ID,
     descending: bool = False,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
 ):
+    if user is None and (mine or favourites):
+        raise AuthError('Authorization required for personal themes')
     query = await get_filtered_themes(user, language, name, mine, verified, favourites)
     query = await apply_themes_ordering(query, order, descending)
     return await paginate(db, query)
@@ -82,11 +85,12 @@ async def get_themes(
     responses={404: {'description': 'Theme not found', 'model': ErrorResponse}},
 )
 async def get_theme(
-    theme_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+    theme_id: int, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)
 ) -> ThemeDetailsResponse:
     theme = await get_theme_or_404(db, theme_id, user)
     return ThemeDetailsResponse.model_validate(
-        theme, update={'likes': len(theme.favourited_by), 'favourite': user in theme.favourited_by}
+        theme,
+        update={'likes': len(theme.favourited_by), 'favourite': user is not None and user in theme.favourited_by},
     )
 
 
