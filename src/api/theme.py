@@ -8,6 +8,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from pydantic import BeforeValidator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 from starlette import status
 from starlette.responses import Response
 
@@ -46,6 +47,13 @@ logger = logging.getLogger('api.theme')
 router = APIRouter(prefix='/themes', tags=['Themes'])
 
 LanguageParam = Annotated[str | None, BeforeValidator(validate_language_alpha2)]
+
+
+async def is_cover_used_by_other_themes(db: AsyncSession, cover_id: int, theme_id: int) -> bool:
+    # Lock cover row until commit so concurrent droppers of same cover serialize
+    await db.exec(select(CoverImage.id).where(CoverImage.id == cover_id).with_for_update())
+    result = await db.exec(select(Theme.id).where(Theme.cover_image_id == cover_id, Theme.id != theme_id).limit(1))
+    return result.first() is not None
 
 
 async def get_theme_or_404(db: AsyncSession, theme_id: int, user: User | None) -> Theme:
@@ -241,19 +249,20 @@ async def upload_theme_cover_image(
 
     filename = await asyncio.to_thread(save_cover, content)
     old_cover = theme.cover_image
+    drop_old = bool(old_cover) and not await is_cover_used_by_other_themes(db, old_cover.id, theme.id)
     try:
         theme.cover_image = CoverImage(
             filename=filename, width=COVER_WIDTH, height=COVER_HEIGHT, size=len(content), uploaded_by=user.id
         )
         db.add(theme)
-        if old_cover:
+        if drop_old:
             await db.delete(old_cover)
         await db.commit()
     except Exception:
         await db.rollback()
         await asyncio.to_thread(delete_cover_file, filename)
         raise
-    if old_cover:
+    if drop_old:
         await asyncio.to_thread(delete_cover_file, old_cover.filename)
 
     await db.refresh(theme)
@@ -279,10 +288,13 @@ async def delete_theme_cover_image(
 
     old_cover = theme.cover_image
     if old_cover:
+        drop_old = not await is_cover_used_by_other_themes(db, old_cover.id, theme.id)
         theme.cover_image = None
         db.add(theme)
-        await db.delete(old_cover)
+        if drop_old:
+            await db.delete(old_cover)
         await db.commit()
-        await asyncio.to_thread(delete_cover_file, old_cover.filename)
+        if drop_old:
+            await asyncio.to_thread(delete_cover_file, old_cover.filename)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
