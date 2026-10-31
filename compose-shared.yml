@@ -35,9 +35,9 @@ services:
     volumes:
       - media_data:/data/media
     environment:
-      DB_HOST: tag_api_db_1
+      DB_HOST: tag_api-db-1
       DB_PORT: 5432
-      REDIS_HOST: tag_api_redis_1
+      REDIS_HOST: tag_api-redis-1
       REDIS_PORT: 6379
     networks:
       - shared
