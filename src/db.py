@@ -62,6 +62,25 @@ class Auth(DbModel, table=True):
     id_token: str | None
 
 
+class Event(SQLModel, table=True):
+    """Product analytics event; written only when COLLECT_ANALYTICS=1"""
+
+    __tablename__ = 'events'
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(max_length=64, index=True)
+    user_id: int | None = Field(default=None, foreign_key='users.id', ondelete='SET NULL', index=True)
+    anon_id: str | None = Field(default=None, max_length=64, index=True)
+    platform: str | None = Field(default=None, max_length=16)
+    app_version: str | None = Field(default=None, max_length=32)
+    props: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default='{}'))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_type=DateTime(timezone=True),
+        sa_column_kwargs={'nullable': False, 'server_default': func.now(), 'index': True},
+    )
+
+
 class CoverImage(DbModel, table=True):
     __tablename__ = 'cover_images'
 

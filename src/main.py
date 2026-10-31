@@ -9,7 +9,8 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from api import auth, game, theme
+from analytics import attach_flush, begin_request, set_client_info
+from api import auth, events, game, theme
 from cache import close_cache, init_cache
 from conf import settings
 from db import get_db
@@ -48,8 +49,22 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(theme.router)
 app.include_router(game.router)
+app.include_router(events.router)
 
 add_pagination(app)
+
+
+@app.middleware('http')
+async def analytics_middleware(request: Request, call_next):
+    set_client_info(
+        request.headers.get('x-anon-id'),
+        request.headers.get('x-platform'),
+        request.headers.get('x-app-version'),
+    )
+    begin_request()
+    response = await call_next(request)
+    attach_flush(response)
+    return response
 
 
 @app.exception_handler(AuthError)

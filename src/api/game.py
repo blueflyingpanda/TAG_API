@@ -6,6 +6,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from analytics import track
 from dal import apply_games_ordering, get_filtered_games, get_game_details
 from db import Game, User, get_db
 from schemas import ErrorResponse
@@ -70,6 +71,16 @@ async def create_game(
     db.add(game_record)
     await db.commit()
     await db.refresh(game_record)
+    track(
+        'game_started',
+        user_id=user.id,
+        props={
+            'game_id': game_record.id,
+            'theme_id': game_record.theme_id,
+            'difficulty': game_record.difficulty,
+            'teams': len(game.info.teams),
+        },
+    )
     return game_record
 
 
@@ -86,6 +97,8 @@ async def update_game(
 ) -> Game:
     game = await get_game_or_404(db, game_id, user)
 
+    was_ended = game.ended_at is not None
+
     game.info = game_info.info.model_dump()
 
     game.words_guessed = list(set(game.words_guessed + game_info.words_guessed))
@@ -95,4 +108,6 @@ async def update_game(
     db.add(game)
     await db.commit()
     await db.refresh(game)
+    if game.ended_at is not None and not was_ended:
+        track('game_completed', user_id=user.id, props={'game_id': game.id, 'theme_id': game.theme_id})
     return game

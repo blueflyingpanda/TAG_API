@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     media_dir: str = '/data/media'
     media_base_url: str = 'https://tag-api.servegame.com/media'
 
+    collect_analytics: bool = False  # COLLECT_ANALYTICS=0|1
+
     debug: bool = False
 
 

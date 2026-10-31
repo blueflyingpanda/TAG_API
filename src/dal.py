@@ -7,7 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlmodel import asc, desc, or_, select
 
-from db import Auth, Game, Theme, User, UserToFavouriteThemes
+from analytics import track
+from db import Auth, CoverImage, Event, Game, Theme, User, UserToFavouriteThemes
+from images import delete_cover_file
 from schemas.game import GameOrderBy
 from schemas.theme import ThemeOrderBy
 from utils.oauth import TelegramUser
@@ -28,13 +30,17 @@ async def get_or_create_telegram_user(tg_user: TelegramUser, db: AsyncSession) -
             last_login=datetime.now(UTC),
         )
         db.add(user)
+        is_new = True
     else:
+        is_new = False
         user.username = tg_user.display_name
         user.picture = tg_user.photo_url or ''
         user.last_login = datetime.now(UTC)
 
     await db.commit()
     await db.refresh(user)
+    if is_new:
+        track('user_registered', user_id=user.id, props={'method': 'telegram'})
     return user
 
 
@@ -55,6 +61,7 @@ async def get_or_create_user(id_token_payload: dict, db: AsyncSession) -> User:
         db.add(user)
         await db.commit()
         await db.refresh(user)
+        track('user_registered', user_id=user.id, props={'method': 'google'})
 
     return user
 
@@ -202,9 +209,24 @@ async def delete_user(db: AsyncSession, user: User):
     await db.execute(delete(Theme).where(Theme.created_by == user.id, Theme.public.is_(False)))
     await db.execute(update(Theme).where(Theme.created_by == user.id).values(created_by=None))
 
+    await db.execute(delete(Event).where(Event.user_id == user.id))
+
+    # Covers of the deleted private themes go away; other covers just lose their uploader
+    used_cover_ids = select(Theme.cover_image_id).where(Theme.cover_image_id.is_not(None))
+    orphaned = await db.execute(
+        select(CoverImage).where(CoverImage.uploaded_by == user.id, CoverImage.id.not_in(used_cover_ids))
+    )
+    orphaned_covers = list(orphaned.scalars())
+    await db.execute(update(CoverImage).where(CoverImage.uploaded_by == user.id).values(uploaded_by=None))
+    for cover in orphaned_covers:
+        await db.delete(cover)
+
     await db.execute(delete(Auth).where(Auth.user_id == user.id))
     await db.execute(delete(User).where(User.id == user.id))
     await db.commit()
+
+    for cover in orphaned_covers:
+        delete_cover_file(cover.filename)
 
 
 async def get_filtered_games(

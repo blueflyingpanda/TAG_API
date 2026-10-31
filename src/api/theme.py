@@ -12,6 +12,7 @@ from sqlmodel import select
 from starlette import status
 from starlette.responses import Response
 
+from analytics import track
 from dal import (
     add_to_favourite,
     apply_themes_ordering,
@@ -112,6 +113,7 @@ async def get_theme(
     theme_id: int, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)
 ) -> ThemeDetailsResponse:
     theme = await get_theme_or_404(db, theme_id, user)
+    track('theme_viewed', user_id=user.id if user else None, props={'theme_id': theme.id})
     return ThemeDetailsResponse.model_validate(
         theme,
         update={'likes': len(theme.favourited_by), 'favourite': user is not None and user in theme.favourited_by},
@@ -137,6 +139,13 @@ async def create_theme(
         db.add(theme_record)
         await db.commit()
         await db.refresh(theme_record)
+        track(
+            'theme_created',
+            user_id=user.id,
+            props={'theme_id': theme_record.id, 'language': theme_record.language, 'public': theme_record.public},
+        )
+        if theme_record.public:
+            track('theme_published', user_id=user.id, props={'theme_id': theme_record.id})
         return theme_record
     except IntegrityError as e:
         logger.error('Could not create new theme: %s', e)
@@ -188,11 +197,14 @@ async def change_theme_visibility(
     user: User = Depends(get_current_user),
 ) -> ThemeDetailsResponse:
     theme = await get_theme_for_update_or_404(db, theme_id, user)
+    became_public = theme_info.public and not theme.public
     theme.public = theme_info.public
 
     db.add(theme)
     await db.commit()
     await db.refresh(theme)
+    if became_public:
+        track('theme_published', user_id=user.id, props={'theme_id': theme.id})
 
     return ThemeDetailsResponse.model_validate(
         theme, update={'likes': len(theme.favourited_by), 'favourite': user in theme.favourited_by}
@@ -208,6 +220,7 @@ async def add_theme_to_favourites(
     theme = await get_theme_or_404(db, theme_id, user)
 
     await add_to_favourite(db, user, theme)
+    track('theme_favourited', user_id=user.id, props={'theme_id': theme.id})
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
