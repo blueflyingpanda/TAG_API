@@ -130,6 +130,17 @@ async def apply_themes_ordering(
     return query
 
 
+async def get_likes_counts(db: AsyncSession, theme_ids: list[int]) -> dict[int, int]:
+    if not theme_ids:
+        return {}
+    result = await db.execute(
+        select(UserToFavouriteThemes.theme_id, func.count(UserToFavouriteThemes.user_id))
+        .where(UserToFavouriteThemes.theme_id.in_(theme_ids))
+        .group_by(UserToFavouriteThemes.theme_id)
+    )
+    return {theme_id: count for theme_id, count in result.all()}
+
+
 async def get_filtered_themes(
     user: User | None,
     language: str | None,

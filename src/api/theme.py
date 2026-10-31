@@ -16,6 +16,7 @@ from dal import (
     add_to_favourite,
     apply_themes_ordering,
     get_filtered_themes,
+    get_likes_counts,
     get_theme_details,
     remove_from_favourite,
 )
@@ -94,7 +95,12 @@ async def get_themes(
         raise AuthError('Authorization required for personal themes')
     query = await get_filtered_themes(user, language, name, mine, verified, favourites)
     query = await apply_themes_ordering(query, order, descending)
-    return await paginate(db, query)
+
+    async def add_likes(themes: list[Theme]) -> list[ThemeListItem]:
+        likes = await get_likes_counts(db, [theme.id for theme in themes])
+        return [ThemeListItem.model_validate(theme, update={'likes': likes.get(theme.id, 0)}) for theme in themes]
+
+    return await paginate(db, query, transformer=add_likes)
 
 
 @router.get(

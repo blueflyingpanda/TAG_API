@@ -52,6 +52,7 @@ ignore = [
     "RUF010", # f'Connection error: {e}' -> f'Connection error: {e!s}'
     "SIM105", # Use `contextlib.suppress(TypeError)` instead of `try`-`except`-`pass` - rule ignored
     "SIM108", # Use `getattr` with a default value instead of catching `AttributeError` - rule ignored
+    "C416",   # Unnecessary dict comprehension (rewrite using `dict()`)
 ]
 
 [tool.ruff.lint.isort]

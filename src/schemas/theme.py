@@ -58,6 +58,7 @@ class ThemeListItem(ThemeBase):
 
     id: int
     cover_image_url: str | None = None
+    likes: int = 0
 
 
 class ThemeCreatePayload(ThemeBase):
