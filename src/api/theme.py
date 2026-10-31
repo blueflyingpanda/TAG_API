@@ -147,6 +147,8 @@ async def update_theme(
 ) -> ThemeDetailsResponse:
     theme = await get_theme_for_update_or_404(db, theme_id, user)
     theme.description = theme_info.description.model_dump()
+    if theme_info.summary is not None:
+        theme.summary = theme_info.summary
 
     db.add(theme)
     await db.commit()

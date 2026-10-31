@@ -77,6 +77,7 @@ class ThemeUpdatePayload(BaseModel):
     """For theme update"""
 
     description: ThemeDescription
+    summary: str | None = Field(default=None, max_length=255)
 
 
 class ThemeOrderBy(StrEnum):
