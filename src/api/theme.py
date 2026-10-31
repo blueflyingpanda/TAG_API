@@ -1,7 +1,8 @@
+import asyncio
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 from pydantic import BeforeValidator
@@ -17,8 +18,17 @@ from dal import (
     get_theme_details,
     remove_from_favourite,
 )
-from db import Theme, User, get_db
+from db import CoverImage, Theme, User, get_db
 from errors import AuthError
+from images import (
+    COVER_HEIGHT,
+    COVER_WIDTH,
+    UPLOAD_MAX_BYTES,
+    InvalidImageError,
+    delete_cover_file,
+    make_cover,
+    save_cover,
+)
 from schemas import ErrorResponse
 from schemas.theme import (
     ThemeCreatePayload,
@@ -195,5 +205,82 @@ async def remove_theme_from_favourites(
     theme = await get_theme_or_404(db, theme_id, user)
 
     await remove_from_favourite(db, user, theme)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put(
+    '/{theme_id}/cover-image',
+    response_model=ThemeDetailsResponse,
+    responses={
+        403: {'description': 'User cannot change specified theme', 'model': ErrorResponse},
+        404: {'description': 'Theme not found', 'model': ErrorResponse},
+        413: {'description': 'Uploaded file is too large', 'model': ErrorResponse},
+        422: {'description': 'Not a usable image', 'model': ErrorResponse},
+    },
+)
+async def upload_theme_cover_image(
+    theme_id: int,
+    file: UploadFile,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ThemeDetailsResponse:
+    """Upload a cover: it is cropped to 16:9, resized to 640x360 and stored as WebP of at most 256 KB"""
+    theme = await get_theme_for_update_or_404(db, theme_id, user)
+
+    data = await file.read(UPLOAD_MAX_BYTES + 1)
+    if len(data) > UPLOAD_MAX_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail='Image is too large')
+
+    try:
+        content = await asyncio.to_thread(make_cover, data)
+    except InvalidImageError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e)) from e
+
+    filename = await asyncio.to_thread(save_cover, content)
+    old_cover = theme.cover_image
+    try:
+        theme.cover_image = CoverImage(
+            filename=filename, width=COVER_WIDTH, height=COVER_HEIGHT, size=len(content), uploaded_by=user.id
+        )
+        db.add(theme)
+        if old_cover:
+            await db.delete(old_cover)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        await asyncio.to_thread(delete_cover_file, filename)
+        raise
+    if old_cover:
+        await asyncio.to_thread(delete_cover_file, old_cover.filename)
+
+    await db.refresh(theme)
+    return ThemeDetailsResponse.model_validate(
+        theme, update={'likes': len(theme.favourited_by), 'favourite': user in theme.favourited_by}
+    )
+
+
+@router.delete(
+    '/{theme_id}/cover-image',
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        403: {'description': 'User cannot change specified theme', 'model': ErrorResponse},
+        404: {'description': 'Theme not found', 'model': ErrorResponse},
+    },
+)
+async def delete_theme_cover_image(
+    theme_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    theme = await get_theme_for_update_or_404(db, theme_id, user)
+
+    old_cover = theme.cover_image
+    if old_cover:
+        theme.cover_image = None
+        db.add(theme)
+        await db.delete(old_cover)
+        await db.commit()
+        await asyncio.to_thread(delete_cover_file, old_cover.filename)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

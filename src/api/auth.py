@@ -114,9 +114,9 @@ async def token(code: str, state: str, cache: Redis = Depends(get_cache), db: As
     if final_redirect:
         if isinstance(final_redirect, bytes):
             final_redirect = final_redirect.decode()
-        return RedirectResponse(f'{final_redirect}?code={exchange_code}', status_code=302)
+        return RedirectResponse(f'{final_redirect}/?code={exchange_code}', status_code=302)
 
-    return RedirectResponse(f'{settings.fe_url}?code={exchange_code}', status_code=302)
+    return RedirectResponse(f'{settings.fe_url}/?code={exchange_code}', status_code=302)
 
 
 class GoogleNativePayload(BaseModel):

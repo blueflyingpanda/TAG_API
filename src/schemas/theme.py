@@ -34,6 +34,7 @@ class ThemeDescription(BaseModel):
 class ThemeBase(SQLModel):
     name: str = Field(max_length=255)
     language: str = Field(default='en', max_length=2)  # ISO 639 alpha-2
+    summary: str = Field(default='', max_length=255)
     verified: bool = False
 
     @field_validator('language')
@@ -44,6 +45,7 @@ class ThemeBase(SQLModel):
 
 class ThemeDetailsResponse(ThemeBase):
     id: int
+    cover_image_url: str | None = None
     public: bool
     description: ThemeDescription
     creator: UserResponse
@@ -55,6 +57,7 @@ class ThemeListItem(ThemeBase):
     """For listing"""
 
     id: int
+    cover_image_url: str | None = None
 
 
 class ThemeCreatePayload(ThemeBase):

@@ -29,6 +29,9 @@ class Settings(BaseSettings):
 
     tg_bot_token: str
 
+    media_dir: str = '/data/media'
+    media_base_url: str = 'https://tag-api.servegame.com/media'
+
     debug: bool = False
 
 

@@ -62,20 +62,39 @@ class Auth(DbModel, table=True):
     id_token: str | None
 
 
+class CoverImage(DbModel, table=True):
+    __tablename__ = 'cover_images'
+
+    filename: str = Field(max_length=255, unique=True)  # relative to media_dir
+    width: int
+    height: int
+    size: int  # bytes
+    uploaded_by: int | None = Field(default=None, foreign_key='users.id')
+
+
 class Theme(DbModel, table=True):
     __tablename__ = 'themes'
 
     name: str = Field(max_length=255, unique=True)
+    summary: str = Field(max_length=255, default='', sa_column_kwargs={'server_default': ''})
     language: str = Field(default='en', max_length=2)  # ISO 639 alpha-2
     description: dict | None = Field(default=None, sa_column=Column(JSONB))
     created_by: int | None = Field(default=None, foreign_key='users.id')
     public: bool = Field(default=False)
     verified: bool = Field(default=False)
+    cover_image_id: int | None = Field(default=None, foreign_key='cover_images.id', ondelete='SET NULL')
 
     creator: User | None = Relationship(back_populates='themes')
+    cover_image: CoverImage | None = Relationship(sa_relationship_kwargs={'lazy': 'joined'})
     games: list[Game] = Relationship(back_populates='theme')
 
     favourited_by: list[User] = Relationship(back_populates='favourite_themes', link_model=UserToFavouriteThemes)
+
+    @property
+    def cover_image_url(self) -> str | None:
+        if self.cover_image is None:
+            return None
+        return f'{settings.media_base_url.rstrip("/")}/{self.cover_image.filename}'
 
 
 class Game(DbModel, table=True):

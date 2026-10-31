@@ -28,6 +28,8 @@ services:
       - "8000"
     env_file:
       - .env
+    volumes:
+      - media_data:/data/media
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -45,6 +47,8 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - media_data:/media:ro
 
 volumes:
   postgres_data:
+  media_data:
