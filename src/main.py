@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from analytics import attach_flush, begin_request, set_client_info
-from api import auth, events, game, theme
+from api import auth, events, game, share, theme
 from cache import close_cache, init_cache
 from conf import settings
 from db import get_db
@@ -50,6 +50,7 @@ app.include_router(auth.router)
 app.include_router(theme.router)
 app.include_router(game.router)
 app.include_router(events.router)
+app.include_router(share.router)
 
 add_pagination(app)
 
